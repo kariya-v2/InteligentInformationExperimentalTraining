@@ -325,7 +325,7 @@ sudo ln -s /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 sudo systemctl start systemd-resolved
 sudo systemctl enable systemd-resolved
 ```
-# 第8章：参考資料
+# 8. 参考資料
 - Pi-hole Official Documentation
 
 - Pi-hole Docker Hub (Official Image)
