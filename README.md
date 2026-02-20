@@ -68,7 +68,10 @@ wsl --install -d Ubuntu-22.04
 ## 3.3 手順②：パッケージの更新と必要ツールの導入
 システムを最新の状態にし、Docker の公式リポジトリを追加するためのツールを入れます。
 ```
+# パッケージリストを最新の状態に更新し、インストール済みの全パッケージを最新版にアップグレードする
 sudo apt update && sudo apt upgrade -y
+
+# Webサイトの証明書確認やデータ転送、暗号鍵管理に必要な基本ツールをインストールする
 sudo apt install -y ca-certificates curl gnupg
 ```
 ## 3.4 手順③：Docker 公式リポジトリの登録
@@ -76,10 +79,12 @@ sudo apt install -y ca-certificates curl gnupg
 ```
 # GPG鍵（セキュリティ証明）の登録
 sudo install -m 0755 -d /etc/apt/keyrings
+# Docker公式サーバーからGPG鍵をダウンロードし、システムの認証用ファイルとして登録する
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+# 登録したGPG鍵ファイルに対し、すべてのユーザーに読み取り権限を付与して有効化する
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-# リポジトリリストへの追加
+# システムのパッケージ入手先リストに、公式のDockerリポジトリを安全な署名付きで追加する
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 sudo apt update
@@ -88,7 +93,8 @@ sudo apt update
 ## 3.5 手順④：Docker Engine & Compose V2 のインストール
 最新の機能を使うためのプラグイン版をインストールします。
 ```
-#dockerのインストール
+# Docker本体（Engine）、操作用ツール（CLI）、コンテナ管理実行環境（containerd）をインストールする
+# また、最新のビルド機能（buildx）や、複数のコンテナを管理するプラグイン（compose）も同時に導入する
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # 現在のユーザーで sudo なしで Docker を動かせるように設定
@@ -175,9 +181,13 @@ docker compose ps
 
 ブラウザで http://localhost:8080/admin を開きます。
 
+![ログイン画面](./images/host1.png)
+
 ログイン画面が表示されたら、.env で設定した WEBPASSWORD を入力してログインします。
 
 ダッシュボードの表示: 下記のような統計画面（Queries Blocked 等）が表示されれば、Web サーバーとしての機能は正常です。
+
+![ダッシュボード](./images/host2.png)
 
 ## 5.2 DNS 名前解決のテスト（疎通確認）
 ターミナル（PowerShell または WSL2）から、Pi-hole が DNS サーバーとして機能しているか nslookup コマンドで検証します。
@@ -189,6 +199,9 @@ dig @127.0.0.1 -p 5300 google.com
 # または nslookup (一部のバージョン)
 nslookup -port=5300 google.com 127.0.0.1
 ```
+
+![疎通確認](./images/kensyou1.png)
+
 - 期待される結果: Google の正しい IP アドレスが返ってくること。
 
 - 確認ポイント: Server: 127.0.0.1 からの回答であることを確認します。
@@ -200,9 +213,14 @@ nslookup -port=5300 google.com 127.0.0.1
 # 広告配信ドメインを 5300 番ポートに対して問い合わせ
 dig @127.0.0.1 -p 5300 doubleclick.net
 ```
-期待される結果: IP アドレスが 0.0.0.0 として返ってくること。
 
-ログ確認: Pi-hole 管理画面の「Query Log」を開き、doubleclick.net が OK (blocked) と赤く表示されていることを確認してください。
+![広告ブロック](./images/kensyou2.png)
+
+- 期待される結果: IP アドレスが 0.0.0.0 として返ってくること。
+
+- ログ確認: Pi-hole 管理画面の「Query Log」を開き、doubleclick.net が OK (blocked) と赤く表示されていることを確認してください。
+
+![ログ確認](./images/host3.png)
 
 ## 5.4 サービスの永続化確認
 WSL2 または Docker を再起動しても、サービスが自動で立ち上がるか確認します。
@@ -257,7 +275,11 @@ echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
 
   - ブラウザのキャッシュをクリアする。
 
-最終章となる第7章では、実運用を想定したセキュリティ面での工夫と、評価基準にある「更新方針」、そして不要になった際にシステムを完全にクリーンアップする手順を記述します。
+## 6.5 ログイン画面でパスワードが分からない
+- 対処法:次のコマンドでパスワードを再設定してください。`docker exec -it pihole pihole setpassword '新しいパスワード'`
+
+## 6.6 Docker Daemonが停止した場合
+- 対処法:次のコマンドで起動してください。`sudo service docker start`
 
 # 7. セキュリティ配慮と環境の初期化
 ## 7.1 セキュリティ配慮
