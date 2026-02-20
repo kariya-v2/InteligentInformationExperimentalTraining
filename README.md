@@ -291,27 +291,22 @@ docker image prune -f
 ## 7.3 環境の初期化（元の状態に戻す方法）
 本課題で作成した環境を削除し、OS の設定を元の状態に戻す手順です。
 
-① コンテナとデータの削除
+コンテナとデータの削除
 ```
 cd ~/pihole-project
 # コンテナの停止と、関連するネットワーク・イメージの削除
-docker-compose down --rmi all
+docker compose down --rmi all
 # 永続化データの削除（必要に応じて）
 cd ..
 rm -rf ~/pihole-project
 ```
-② DNS 設定（systemd-resolved）の復元
-WSL2（Ubuntu）の DNS 設定を標準状態に戻します。
+## 7.2 復旧の確認
+環境が正しく削除されたかを確認します。
 
-```
-# 1. シンボリックリンクの再作成（OS標準の状態へ）
-sudo rm /etc/resolv.conf
-sudo ln -s /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+- コンテナの確認: docker ps -a を実行し、pihole コンテナが表示されないこと。
 
-# 2. サービスの再開と有効化
-sudo systemctl start systemd-resolved
-sudo systemctl enable systemd-resolved
-```
+- ポートの解放: sudo lsof -i :5300 を実行し、何も表示されない（ポートが空いている）こと。
+
 # 8. 参考資料
 - Pi-hole Official Documentation
 
