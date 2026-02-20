@@ -48,13 +48,13 @@ Pi-holeを正常に動作させるため、ホスト（WSL2）とコンテナ間
 ## 3.1 実行環境（前提条件）
 本手順書は、以下の環境で動作を確認しています。これらを用意してください。
 
-- OS: Windows 11 Pro / Home (22H2以上推奨)
+- ホストOS: Windows 11 / 10 (21H2以降推奨)
 
 - プラットフォーム: WSL2 (Windows Subsystem for Linux 2)
 
-- ディストリビューション: Ubuntu 22.04 LTS
+- Linuxディストリビューション: Ubuntu 22.04 LTS
 
-- ネットワーク: インターネット接続環境（固定IPは不要だが、WSL内のIP確認が必要）
+- Docker: Docker Engine (v24.0以降) / Docker Compose (V2)
 
 ## 3.2 手順①：WSL2とUbuntuのセットアップ
 まだWSL2を導入していない場合は、Windowsターミナル（PowerShell）を管理者権限で開き、以下のコマンドを実行します。
@@ -65,38 +65,34 @@ wsl --install -d Ubuntu-22.04
 
 # インストール後、PCを再起動し、ユーザー名・パスワードを設定してください。
 ```
-## 3.3 手順②：パッケージの更新
-Ubuntuにログインし、システムを最新の状態にします。
+## 3.3 手順②：パッケージの更新と必要ツールの導入
+システムを最新の状態にし、Docker の公式リポジトリを追加するためのツールを入れます。
 ```
-# パッケージリストの更新とアップグレード
 sudo apt update && sudo apt upgrade -y
+sudo apt install -y ca-certificates curl gnupg
 ```
-## 3.4 手順③：ポート53の競合回避（重要）
-Ubuntu 22.04では、systemd-resolved が DNS 用のポート 53 を既に使用しています。これを停止させないと Pi-hole が起動できません。
-1.サービスの停止と無効化:
+## 3.4 手順③：Docker 公式リポジトリの登録
+標準の apt リポジトリよりも新しい、公式の Docker パッケージを使用できるように設定します。
 ```
-sudo systemctl stop systemd-resolved
-sudo systemctl disable systemd-resolved
-```
-2.DNS解決設定の変更:
-`/etc/resolv.conf` が `systemd-resolved` へのシンボリックリンクになっているため、削除して新しく作成します。
-```
-sudo rm /etc/resolv.conf
-echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
-```
-**注釈**: これにより、WSL自体が一時的にGoogle DNS ($8.8.8.8$) を使うようになり、Dockerイメージのダウンロードが可能になります。
+# GPG鍵（セキュリティ証明）の登録
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-## 3.5 手順④：Docker & Docker Compose のインストール
-コンテナ環境を構築するためのツールをインストールします。
-```
-# Dockerのインストール
-sudo apt install -y docker.io docker-compose
+# リポジトリリストへの追加
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# 現在のユーザーをdockerグループに追加（sudoなしで実行可能にするため）
+sudo apt update
+```
+
+## 3.5 手順④：Docker Engine & Compose V2 のインストール
+最新の機能を使うためのプラグイン版をインストールします。
+```
+#dockerのインストール
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# 現在のユーザーで sudo なしで Docker を動かせるように設定
 sudo usermod -aG docker $USER
-
-# 反映のために一度ログアウトして再ログイン、または以下のコマンドを実行
-newgrp docker
 ```
 
 # 4. 構築手順（Docker Compose設定）
