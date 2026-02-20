@@ -224,7 +224,7 @@ unless-stopped と表示されれば、手動で止めない限り OS 起動時�
 ## 6.1 ポート53が既に使用されている（Bind for 0.0.0.0:53 failed）
 docker-compose up 時に、ポート53の競合エラーが発生した場合。
 
-- 原因: 第3章の systemd-resolved の停止が不完全であるか、他のDNSサービス（以前のインストール物など）が動いている。
+- 原因: 第3章の systemd-resolved の停止が不完全であるか、他のDNSサービス（以前のインストール物など）が動いている。または、Windows側でポート53が使われている。(特にSharedAccess)
 
 - 対処法: 以下のコマンドで、現在ポート53を占有しているプロセスを確認して停止します。
 
@@ -233,6 +233,24 @@ docker-compose up 時に、ポート53の競合エラーが発生した場合。
 sudo lsof -i :53
 # 該当するプロセスを停止（例：PID 1234の場合）
 sudo kill -9 1234
+```
+該当するものがなかった場合、Windows側でポート53が使われている可能性が高いので、Windowsのターミナル（PowerShell）を管理者権限で開き以下の手順で確認と停止をしてください。
+```
+#Windows側のポートを確認
+netstat -ano | findstr :53
+#ポート53を使っているサービスの特定(例：PID 2996の場合)
+tasklist /fi "pid eq 2996"
+#サービスの起動を自動から無効に変える(例：SharedAccessの場合)
+Set-Service -Name SharedAccess -StartupType Automatic
+```
+サービスをもとに戻したい場合は**必ずdocker**を止めてから以下のコマンド打ってください。
+```
+#dockerを止める
+docker-compose down
+#サービスの開始(例：SharedAccessの場合)
+Start-Service -Name SharedAccess 
+#サービスの起動を自動にもどす(例：SharedAccessの場合)
+Set-Service -Name SharedAccess -StartupType Automatic
 ```
 ## 6.2 WSL2再起動後にインターネットに繋がらない
 WSL2を再起動した後、apt update 等が失敗する場合。
