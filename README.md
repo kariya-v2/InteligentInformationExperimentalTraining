@@ -32,14 +32,10 @@ Pi-holeを正常に動作させるため、ホスト（WSL2）とコンテナ間
 
 | ホスト側ポート                          | コンテナ側ポート                                         | プロトコル          |用途        |
 | :---------------------------- | :------------------------------------------- | :------------------- |:--------------------|
-| 53                    | 53                                 | UDP/TCP`             |DNSサービス: 名前解決のリクエストを受け付ける最重要ポート。|
+| 5300                    | 53                                 | UDP/TCP`             |DNSサービス: ホストのポート53競合回避のため5300番を使用。|
 | 8080       | 80           | TCP   |管理画面 (Web UI): ブラウザから設定・統計を確認するためのポート。|
-| 443 (任意)                    |443             | TCP |HTTPS: Webインターフェースの暗号化用（本構成では基本HTTPを使用）。
-| 
+ 
 
-> [!IMPORTANT]
-ポート53の競合について
-多くのLinuxディストリビューション（Ubuntu等）では、デフォルトで systemd-resolved というサービスがポート53を使用しています。このままではPi-holeを起動できないため、次章以降の「事前準備」でこの競合を解消する設定を行います。
 
 ## 2.3 データの永続化
 コンテナを削除しても設定やログが消えないよう、ホスト上のディレクトリをコンテナ内にマウントします。
@@ -149,8 +145,8 @@ services:
     image: pihole/pihole:latest
     # ホストとコンテナのポートを紐付け
     ports:
-      - "53:53/tcp"
-      - "53:53/udp"
+      - "5300:53/tcp"
+      - "5300:53/udp"
       - "8080:80/tcp" # 管理画面をホストの8080で公開
     environment:
       TZ: ${TZ}
@@ -191,8 +187,11 @@ docker ps
 ターミナル（PowerShell または WSL2）から、Pi-hole が DNS サーバーとして機能しているか nslookup コマンドで検証します。
 
 ```
-# ローカルホスト（Pi-hole）を指定して google.com を名前解決
-nslookup google.com 127.0.0.1
+# digコマンドによる検証（-p 5300 でポートを指定）
+dig @127.0.0.1 -p 5300 google.com
+
+# または nslookup (一部のバージョン)
+nslookup -port=5300 google.com 127.0.0.1
 ```
 - 期待される結果: Google の正しい IP アドレスが返ってくること。
 
@@ -202,8 +201,8 @@ nslookup google.com 127.0.0.1
 次に、既知の広告ドメインを問い合わせ、Pi-hole が正しく「ブロック」するかを確認します。
 
 ```
-# 代表的な広告配信ドメイン（doubleclick.net）を問い合わせ
-nslookup doubleclick.net 127.0.0.1
+# 広告配信ドメインを 5300 番ポートに対して問い合わせ
+dig @127.0.0.1 -p 5300 doubleclick.net
 ```
 期待される結果: IP アドレスが 0.0.0.0 として返ってくること。
 
@@ -221,37 +220,11 @@ unless-stopped と表示されれば、手動で止めない限り OS 起動時�
 # 6. トラブルシューティング
 構築過程で発生しやすい代表的なエラーと、その具体的な対処法を記述します。
 
-## 6.1 ポート53が既に使用されている（Bind for 0.0.0.0:53 failed）
-docker-compose up 時に、ポート53の競合エラーが発生した場合。
+## 6.1 ポート53が使用できない問題への対応
+現象: Windowsの SharedAccess (ICS) や svchost.exe がポート53を占有しており、コンテナが起動できない。
 
-- 原因: 第3章の systemd-resolved の停止が不完全であるか、他のDNSサービス（以前のインストール物など）が動いている。または、Windows側でポート53が使われている。(特にSharedAccess)
+対処: 本手順書では、設計変更によりホスト側の公開ポートを 5300 に変更することでこの問題を回避している。実運用で53番を使いたい場合は、Windows側のサービス停止が必要となるが、本構成（5300番）であればそのままで動作可能。
 
-- 対処法: 以下のコマンドで、現在ポート53を占有しているプロセスを確認して停止します。
-
-```
-# ポート53を使用しているプロセスID(PID)を確認
-sudo lsof -i :53
-# 該当するプロセスを停止（例：PID 1234の場合）
-sudo kill -9 1234
-```
-該当するものがなかった場合、Windows側でポート53が使われている可能性が高いので、Windowsのターミナル（PowerShell）を管理者権限で開き以下の手順で確認と停止をしてください。
-```
-#Windows側のポートを確認
-netstat -ano | findstr :53
-#ポート53を使っているサービスの特定(例：PID 2996の場合)
-tasklist /fi "pid eq 2996"
-#サービスの起動を自動から無効に変える(例：SharedAccessの場合)
-Set-Service -Name SharedAccess -StartupType Automatic
-```
-サービスをもとに戻したい場合は**必ずdocker**を止めてから以下のコマンド打ってください。
-```
-#dockerを止める
-docker-compose down
-#サービスの開始(例：SharedAccessの場合)
-Start-Service -Name SharedAccess 
-#サービスの起動を自動にもどす(例：SharedAccessの場合)
-Set-Service -Name SharedAccess -StartupType Automatic
-```
 ## 6.2 WSL2再起動後にインターネットに繋がらない
 WSL2を再起動した後、apt update 等が失敗する場合。
 
@@ -325,8 +298,8 @@ docker image prune -f
 ① コンテナとデータの削除
 ```
 cd ~/pihole-project
-# コンテナとネットワークの削除
-docker-compose down
+# コンテナの停止と、関連するネットワーク・イメージの削除
+docker-compose down --rmi all
 # 永続化データの削除（必要に応じて）
 cd ..
 rm -rf ~/pihole-project
