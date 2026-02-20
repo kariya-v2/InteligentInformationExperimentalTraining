@@ -161,10 +161,10 @@ services:
 
 ```
 # コンテナのビルドと起動
-docker-compose up -d
+docker compose up -d
 
 # 起動状態の確認（StatusがUpになっているか）
-docker ps
+docker compose ps
 ```
 
 # 5. 動作確認と検証
